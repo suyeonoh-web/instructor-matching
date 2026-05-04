@@ -5442,9 +5442,9 @@ function downloadScheduleTemplate() {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  MailLogTab — 보낸 메일 내역 + 답변 여부
+//  MailLogSection — 마이페이지 내 보낸 메일 내역 + 답변 여부
 // ══════════════════════════════════════════════════════════════
-function MailLogTab() {
+function MailLogSection() {
   const [mails, setMails] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -5471,10 +5471,10 @@ function MailLogTab() {
   }) : [];
 
   return (
-    <div style={{maxWidth:820,margin:'0 auto',display:'grid',gap:16}}>
-      <div className="glass au" style={{borderRadius:18,padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+    <div style={{marginTop:24,display:'grid',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
         <div>
-          <div style={{fontFamily:'Outfit,sans-serif',fontSize:16,fontWeight:700,color:'var(--cream)',marginBottom:2}}>메일 발송 내역</div>
+          <div style={{fontFamily:'Outfit,sans-serif',fontSize:15,fontWeight:700,color:'var(--cream)',marginBottom:2}}>✉️ 메일 발송 내역</div>
           <div style={{fontSize:11,color:'var(--cream-3)'}}>강사에게 보낸 출강 요청 이메일 및 답변 여부를 추적합니다.</div>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
@@ -6336,6 +6336,9 @@ function MyPageTab() {
           />
         );
       })()}
+
+      {/* ── 메일 발송 내역 ─────────────────────────────── */}
+      <MailLogSection/>
     </div>
   );
 }
@@ -6376,7 +6379,7 @@ function App({usingLiveData}) {
     localStorage.setItem('im_dark', darkMode);
   },[darkMode]);
 
-  const TABS = [{id:'recommend',label:'강사 추천'},{id:'db',label:'강사 DB'},{id:'calendar',label:'일정 관리'},{id:'maillog',label:'메일 내역'},{id:'mypage',label:'마이페이지'}];
+  const TABS = [{id:'recommend',label:'강사 추천'},{id:'db',label:'강사 DB'},{id:'calendar',label:'일정 관리'},{id:'mypage',label:'마이페이지'}];
 
   return (
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
@@ -6527,7 +6530,6 @@ function App({usingLiveData}) {
         )}
         {tab==='db' && <DBTab req={currentReq} onGoCalendar={function(inst){setCalendarSelInst(inst);setTab('calendar');}}/>}
         {tab==='calendar' && <CalendarTab req={currentReq} initSelInst={calendarSelInst}/>}
-        {tab==='maillog' && <MailLogTab/>}
         {tab==='mypage' && <MyPageTab/>}
       </main>
       {showLogin && <LoginModal onLogin={function(nm){setCurrentUser(nm);setShowLogin(false);}}/>}
