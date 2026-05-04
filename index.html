@@ -5441,6 +5441,111 @@ function downloadScheduleTemplate() {
   URL.revokeObjectURL(url);
 }
 
+// ══════════════════════════════════════════════════════════════
+//  MailLogTab — 보낸 메일 내역 + 답변 여부
+// ══════════════════════════════════════════════════════════════
+function MailLogTab() {
+  const [mails, setMails] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [filter, setFilter] = React.useState('all'); // all | replied | unreplied
+
+  function load() {
+    if (!APPS_SCRIPT_URL) { setErr('GAS URL이 설정되지 않았습니다.'); return; }
+    setLoading(true); setErr('');
+    fetch(APPS_SCRIPT_URL + '?action=sent_emails')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        setMails(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(function(){ setErr('메일 내역을 불러오지 못했습니다.'); setLoading(false); });
+  }
+
+  React.useEffect(function(){ load(); }, []);
+
+  var shown = mails ? mails.filter(function(m){
+    if (filter === 'replied')   return m.replied;
+    if (filter === 'unreplied') return !m.replied;
+    return true;
+  }) : [];
+
+  return (
+    <div style={{maxWidth:820,margin:'0 auto',display:'grid',gap:16}}>
+      <div className="glass au" style={{borderRadius:18,padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+        <div>
+          <div style={{fontFamily:'Outfit,sans-serif',fontSize:16,fontWeight:700,color:'var(--cream)',marginBottom:2}}>메일 발송 내역</div>
+          <div style={{fontSize:11,color:'var(--cream-3)'}}>강사에게 보낸 출강 요청 이메일 및 답변 여부를 추적합니다.</div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          {['all','replied','unreplied'].map(function(f){
+            var label = f==='all'?'전체':f==='replied'?'답변 완료':'미답변';
+            return (
+              <button key={f} onClick={function(){setFilter(f);}}
+                style={{padding:'6px 14px',borderRadius:99,border:'1px solid '+(filter===f?'var(--indigo)':'var(--border)'),background:filter===f?'var(--indigo-g)':'transparent',color:filter===f?'var(--indigo-2)':'var(--cream-3)',fontSize:12,cursor:'pointer',fontWeight:filter===f?700:400}}>
+                {label}
+              </button>
+            );
+          })}
+          <button onClick={load} style={{padding:'6px 14px',borderRadius:99,border:'1px solid var(--border)',background:'transparent',color:'var(--cream-3)',fontSize:12,cursor:'pointer'}}>
+            {loading ? '로딩 중…' : '새로고침'}
+          </button>
+        </div>
+      </div>
+
+      {err && <div style={{padding:'14px 18px',borderRadius:14,border:'1px solid rgba(248,113,113,.3)',background:'rgba(248,113,113,.08)',color:'#f87171',fontSize:13}}>{err}</div>}
+
+      {loading && !mails && (
+        <div style={{padding:'40px',textAlign:'center',color:'var(--cream-3)',fontSize:13}}>Gmail에서 발송 내역 불러오는 중…</div>
+      )}
+
+      {mails !== null && !loading && shown.length === 0 && (
+        <div className="glass au" style={{borderRadius:14,padding:'32px',textAlign:'center',color:'var(--cream-3)',fontSize:13}}>
+          {filter==='all' ? '강사에게 보낸 메일이 없습니다.' : filter==='replied' ? '답변 완료된 메일이 없습니다.' : '미답변 메일이 없습니다.'}
+        </div>
+      )}
+
+      {shown.length > 0 && (
+        <div className="glass au" style={{borderRadius:16,overflow:'hidden'}}>
+          <table style={{width:'100%',fontSize:13,borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'var(--ink-3)'}}>
+                <th style={{padding:'10px 16px',textAlign:'left',fontWeight:600,color:'var(--cream-3)',fontSize:11,letterSpacing:.5}}>강사명</th>
+                <th style={{padding:'10px 16px',textAlign:'left',fontWeight:600,color:'var(--cream-3)',fontSize:11,letterSpacing:.5}}>발송일</th>
+                <th style={{padding:'10px 16px',textAlign:'left',fontWeight:600,color:'var(--cream-3)',fontSize:11,letterSpacing:.5}}>제목</th>
+                <th style={{padding:'10px 16px',textAlign:'center',fontWeight:600,color:'var(--cream-3)',fontSize:11,letterSpacing:.5}}>답변</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map(function(m, i){
+                return (
+                  <tr key={i} style={{borderTop:'1px solid var(--border)',background:i%2?'rgba(255,255,255,.015)':'transparent'}}>
+                    <td style={{padding:'10px 16px',fontWeight:600,color:'var(--cream)'}}>{m.instructorName}</td>
+                    <td style={{padding:'10px 16px',color:'var(--cream-3)',whiteSpace:'nowrap'}}>{m.date}</td>
+                    <td style={{padding:'10px 16px',color:'var(--cream-2)',maxWidth:340,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{m.subject}</td>
+                    <td style={{padding:'10px 16px',textAlign:'center'}}>
+                      {m.replied
+                        ? <span style={{padding:'3px 10px',borderRadius:99,background:'rgba(52,211,153,.12)',border:'1px solid rgba(52,211,153,.35)',color:'#34D399',fontSize:11,fontWeight:700}}>답변 완료</span>
+                        : <span style={{padding:'3px 10px',borderRadius:99,background:'rgba(251,191,36,.08)',border:'1px solid rgba(251,191,36,.3)',color:'#FBBF24',fontSize:11,fontWeight:700}}>미답변</span>
+                      }
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {mails !== null && (
+        <div style={{fontSize:11,color:'var(--cream-3)',textAlign:'center'}}>
+          전체 {mails.length}건 · 답변 완료 {mails.filter(function(m){return m.replied;}).length}건 · 미답변 {mails.filter(function(m){return !m.replied;}).length}건
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CalendarTab({req, initSelInst}) {
   const [selInst, setSelInst] = useState(null);
   useEffect(function() { if (initSelInst) setSelInst(initSelInst); }, [initSelInst]);
@@ -6271,7 +6376,7 @@ function App({usingLiveData}) {
     localStorage.setItem('im_dark', darkMode);
   },[darkMode]);
 
-  const TABS = [{id:'recommend',label:'강사 추천'},{id:'db',label:'강사 DB'},{id:'calendar',label:'일정 관리'},{id:'mypage',label:'마이페이지'}];
+  const TABS = [{id:'recommend',label:'강사 추천'},{id:'db',label:'강사 DB'},{id:'calendar',label:'일정 관리'},{id:'maillog',label:'메일 내역'},{id:'mypage',label:'마이페이지'}];
 
   return (
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
@@ -6422,6 +6527,7 @@ function App({usingLiveData}) {
         )}
         {tab==='db' && <DBTab req={currentReq} onGoCalendar={function(inst){setCalendarSelInst(inst);setTab('calendar');}}/>}
         {tab==='calendar' && <CalendarTab req={currentReq} initSelInst={calendarSelInst}/>}
+        {tab==='maillog' && <MailLogTab/>}
         {tab==='mypage' && <MyPageTab/>}
       </main>
       {showLogin && <LoginModal onLogin={function(nm){setCurrentUser(nm);setShowLogin(false);}}/>}
@@ -6440,10 +6546,7 @@ function AppWithData() {
     if (asUrl) {
       var _t0 = Date.now();
       _gasConnectTime = new Date().toISOString();
-      // GAS 캐시 초기화(실패해도 무시) 후 강사 데이터 로드
-      fetch(asUrl + '?action=refresh_cache').catch(function(){}).then(function() {
-        return fetch(asUrl + '?action=instructors');
-      })
+      fetch(asUrl + '?action=instructors')
         .then(r => r.json())
         .then(data => {
           _gasDisconnectTime = new Date().toISOString();
