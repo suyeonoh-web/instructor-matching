@@ -6435,53 +6435,7 @@ function AppWithData() {
   const [loadMsg, setLoadMsg] = useState('강사 데이터 로딩 중...');
 
   useEffect(() => {
-    // 1순위: Apps Script URL (배포된 경우)
-    const asUrl = APPS_SCRIPT_URL;
-    if (asUrl) {
-      var _t0 = Date.now();
-      _gasConnectTime = new Date().toISOString();
-      fetch(asUrl + '?action=instructors')
-        .then(r => r.json())
-        .then(data => {
-          _gasDisconnectTime = new Date().toISOString();
-          _gasResponseMs = Date.now() - _t0;
-          // GAS는 { instructors: [...] } 또는 순수 배열 두 가지 형식 지원
-          const list = Array.isArray(data) ? data
-                     : (data && Array.isArray(data.instructors)) ? data.instructors
-                     : null;
-          if (list && list.length) {
-            INSTRUCTORS = applyEmbeddedData(list.map(normalizeInstructor));
-            IS_LIVE_DATA = true;
-            setUsingLiveData(true);
-            // 일정 사전 로드: matchInstructors 필터에서 scheduleStatus 활용
-            fetch(asUrl + '?action=schedules')
-              .then(function(r) { return r.json(); })
-              .then(function(sData) {
-                if (!Array.isArray(sData)) return;
-                sData.forEach(function(s) {
-                  if (!s.name || !s.calendar || !s.calendar.length) return;
-                  var inst = INSTRUCTORS.find(function(x) { return x.name === s.name; });
-                  if (!inst) return;
-                  s.calendar.forEach(function(e) {
-                    if (!inst.calendar.some(function(x) { return x.date === e.date; })) inst.calendar.push(e);
-                  });
-                  if (s.calendar.some(function(e) { return e.status === '확정'; })) {
-                    inst.scheduleStatus = '확정';
-                  } else if (s.calendar.some(function(e) { return e.status === '논의 중'; }) && inst.scheduleStatus === '미확인') {
-                    inst.scheduleStatus = '논의 중';
-                  }
-                });
-              })
-              .catch(function() {});
-            setReady(true);
-            return;
-          }
-          loadCSV();
-        })
-        .catch(loadCSV);
-      return;
-    }
-    // 2순위: 공개 CSV 직접 로드
+    // Google Sheets(gviz) DB를 1순위로 로드 — GAS는 로그·이메일 전용
     loadCSV();
   }, []);
 
