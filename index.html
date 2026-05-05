@@ -6565,23 +6565,24 @@ function AppWithData() {
             fetch(asUrl + '?action=schedules')
               .then(function(r) { return r.json(); })
               .then(function(sData) {
-                if (!Array.isArray(sData)) return;
-                sData.forEach(function(s) {
-                  if (!s.name || !s.calendar || !s.calendar.length) return;
-                  var inst = INSTRUCTORS.find(function(x) { return x.name === s.name; });
-                  if (!inst) return;
-                  s.calendar.forEach(function(e) {
-                    if (!inst.calendar.some(function(x) { return x.date === e.date; })) inst.calendar.push(e);
+                if (Array.isArray(sData)) {
+                  sData.forEach(function(s) {
+                    if (!s.name || !s.calendar || !s.calendar.length) return;
+                    var inst = INSTRUCTORS.find(function(x) { return x.name === s.name; });
+                    if (!inst) return;
+                    s.calendar.forEach(function(e) {
+                      if (!inst.calendar.some(function(x) { return x.date === e.date; })) inst.calendar.push(e);
+                    });
+                    if (s.calendar.some(function(e) { return e.status === '확정'; })) {
+                      inst.scheduleStatus = '확정';
+                    } else if (s.calendar.some(function(e) { return e.status === '논의 중'; }) && inst.scheduleStatus === '미확인') {
+                      inst.scheduleStatus = '논의 중';
+                    }
                   });
-                  if (s.calendar.some(function(e) { return e.status === '확정'; })) {
-                    inst.scheduleStatus = '확정';
-                  } else if (s.calendar.some(function(e) { return e.status === '논의 중'; }) && inst.scheduleStatus === '미확인') {
-                    inst.scheduleStatus = '논의 중';
-                  }
-                });
+                }
+                setReady(true);
               })
-              .catch(function() {});
-            setReady(true);
+              .catch(function() { setReady(true); });
             return;
           }
           loadCSV();
