@@ -5632,36 +5632,11 @@ function CalendarTab({req, initSelInst}) {
     });
   };
 
-  // 초기 로드: INSTRUCTORS.calendar는 AppWithData가 이미 채워줌
-  // CalendarTab은 remoteCals에 추가 동기화만 담당
+  // AppWithData가 setReady 전에 schedules를 모두 채워줬으므로
+  // 초기 로드 시 별도 fetch 없이 inst.calendar를 바로 사용
   useEffect(function() {
     if (window.INJECTED_SCHEDULES && typeof window.INJECTED_SCHEDULES === 'object') {
       mergeRemote(window.INJECTED_SCHEDULES);
-    }
-    // INSTRUCTORS.calendar가 비어있을 때만 GAS 보완 fetch
-    var needFetch = INSTRUCTORS.some(function(i){ return !i.calendar || !i.calendar.length; });
-    if (needFetch && APPS_SCRIPT_URL) {
-      setLoadingSchedules(true);
-      fetch(APPS_SCRIPT_URL + '?action=schedules')
-        .then(function(r){ return r.json(); })
-        .then(function(data) {
-          if (Array.isArray(data)) {
-            var map = {};
-            data.forEach(function(s) {
-              if (!s.name || !s.calendar || !s.calendar.length) return;
-              map[s.name] = s.calendar;
-              var inst = INSTRUCTORS.find(function(x){ return x.name === s.name; });
-              if (inst) {
-                s.calendar.forEach(function(e) {
-                  if (!inst.calendar.some(function(x){ return x.date === e.date; })) inst.calendar.push(e);
-                });
-              }
-            });
-            mergeRemote(map);
-          }
-        })
-        .catch(function(){})
-        .finally(function(){ setLoadingSchedules(false); });
     }
   }, []);
 
