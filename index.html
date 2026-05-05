@@ -5632,6 +5632,21 @@ function CalendarTab({req, initSelInst}) {
     });
   };
 
+  // 강사 선택 시 가장 가까운 일정 달로 자동 이동
+  useEffect(function() {
+    if (!selInst) return;
+    var busy = getInstBusy(selInst);
+    if (!busy.length) return;
+    var todayStr = new Date().toISOString().slice(0,10);
+    var upcoming = busy.filter(function(c){ return c.date >= todayStr; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+    var past     = busy.filter(function(c){ return c.date <  todayStr; }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+    var target   = upcoming.length ? upcoming[0] : (past.length ? past[0] : null);
+    if (!target) return;
+    var ty = parseInt(target.date.slice(0,4));
+    var tm = parseInt(target.date.slice(5,7)) - 1;
+    if (ty !== yr || tm !== mo) { setYr(ty); setMo(tm); }
+  }, [selInst]);
+
   // 마운트 시 일정 백그라운드 로드 (AppWithData 사전 로드 실패 대비)
   useEffect(function() {
     if (window.INJECTED_SCHEDULES && typeof window.INJECTED_SCHEDULES === 'object') {
@@ -6546,28 +6561,23 @@ function AppWithData() {
             INSTRUCTORS = applyEmbeddedData(list.map(normalizeInstructor));
             IS_LIVE_DATA = true;
             setUsingLiveData(true);
-            // 일정 사전 로드: matchInstructors 필터에서 scheduleStatus 활용
+            setReady(true); // 강사 목록 로드 즉시 표시 — 일정은 CalendarTab에서 백그라운드 로드
+            // 일정 사전 로드 (best-effort): CalendarTab 백그라운드 fetch와 병행
             fetch(asUrl + '?action=schedules')
               .then(function(r) { return r.json(); })
               .then(function(sData) {
-                if (Array.isArray(sData)) {
-                  sData.forEach(function(s) {
-                    if (!s.name || !s.calendar || !s.calendar.length) return;
-                    var inst = INSTRUCTORS.find(function(x) { return x.name === s.name; });
-                    if (!inst) return;
-                    s.calendar.forEach(function(e) {
-                      if (!inst.calendar.some(function(x) { return x.date === e.date; })) inst.calendar.push(e);
-                    });
-                    if (s.calendar.some(function(e) { return e.status === '확정'; })) {
-                      inst.scheduleStatus = '확정';
-                    } else if (s.calendar.some(function(e) { return e.status === '논의 중'; }) && inst.scheduleStatus === '미확인') {
-                      inst.scheduleStatus = '논의 중';
-                    }
+                if (!Array.isArray(sData)) return;
+                sData.forEach(function(s) {
+                  if (!s.name || !s.calendar || !s.calendar.length) return;
+                  var inst = INSTRUCTORS.find(function(x) { return x.name === s.name; });
+                  if (!inst) return;
+                  s.calendar.forEach(function(e) {
+                    if (!inst.calendar.some(function(x) { return x.date === e.date; })) inst.calendar.push(e);
                   });
-                }
-                setReady(true);
+                  if (s.calendar.some(function(e) { return e.status === '확정'; })) inst.scheduleStatus = '확정';
+                });
               })
-              .catch(function() { setReady(true); });
+              .catch(function() {});
             return;
           }
           loadCSV();
