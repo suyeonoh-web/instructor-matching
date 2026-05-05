@@ -5632,46 +5632,36 @@ function CalendarTab({req, initSelInst}) {
     });
   };
 
-  // 초기 로드: INJECTED_SCHEDULES + GAS + Google Sheets
+  // 초기 로드: INSTRUCTORS.calendar는 AppWithData가 이미 채워줌
+  // CalendarTab은 remoteCals에 추가 동기화만 담당
   useEffect(function() {
     if (window.INJECTED_SCHEDULES && typeof window.INJECTED_SCHEDULES === 'object') {
       mergeRemote(window.INJECTED_SCHEDULES);
     }
-    // GAS 일정 (기존)
-    if (APPS_SCRIPT_URL) {
+    // INSTRUCTORS.calendar가 비어있을 때만 GAS 보완 fetch
+    var needFetch = INSTRUCTORS.some(function(i){ return !i.calendar || !i.calendar.length; });
+    if (needFetch && APPS_SCRIPT_URL) {
+      setLoadingSchedules(true);
       fetch(APPS_SCRIPT_URL + '?action=schedules')
-        .then(function(r){return r.json();})
-        .then(function(data){
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
           if (Array.isArray(data)) {
             var map = {};
-            data.forEach(function(s){ if(s.name&&s.calendar&&s.calendar.length) map[s.name]=s.calendar; });
-            mergeRemote(map);
-          }
-        }).catch(function(){});
-    }
-    // Google Sheets 계약 일정 자동 로드
-    setLoadingSchedules(true);
-    loadSheetsSchedule(function(combined) {
-      mergeRemote(combined);
-      setLoadingSchedules(false);
-    });
-    // 강사별 캘린더 시트 (calendar_reader_gas.gs, 기존 GAS 프로젝트에 파일 추가)
-    if (APPS_SCRIPT_URL) {
-      fetch(APPS_SCRIPT_URL + '?action=calendar_schedules')
-        .then(function(r){return r.json();})
-        .then(function(data){
-          if (Array.isArray(data)) {
-            var map = {};
-            data.forEach(function(s){
+            data.forEach(function(s) {
               if (!s.name || !s.calendar || !s.calendar.length) return;
               map[s.name] = s.calendar;
-              var inst = INSTRUCTORS.find(function(x){return x.name === s.name;});
-              if (!inst) return;
-              if (s.calendar.some(function(e){return e.status==='확정';})) inst.scheduleStatus='확정';
+              var inst = INSTRUCTORS.find(function(x){ return x.name === s.name; });
+              if (inst) {
+                s.calendar.forEach(function(e) {
+                  if (!inst.calendar.some(function(x){ return x.date === e.date; })) inst.calendar.push(e);
+                });
+              }
             });
             mergeRemote(map);
           }
-        }).catch(function(){});
+        })
+        .catch(function(){})
+        .finally(function(){ setLoadingSchedules(false); });
     }
   }, []);
 
