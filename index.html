@@ -1114,6 +1114,11 @@ function matchInstructors(req) {
         }
       });
     }
+    // 모니터링 특이사항 — 추천 시 참고용으로 표시
+    (inst.monitoringRecords||[]).forEach(function(m) {
+      if (m.weaknesses && m.weaknesses.trim()) warns.push({text:'[모니터링] ' + m.weaknesses.trim() + (m.course ? ' (' + m.course + ')' : ''), level:'warn'});
+      if (m.issue && m.issue.trim()) warns.push({text:'[이슈] ' + m.issue.trim() + (m.course ? ' (' + m.course + ')' : ''), level:'warn'});
+    });
     passed.push({inst, s1, s2, s3, s4, total, allAvg, topPos, topNeg, warns, label, labelCls, reason, tier});
   });
   // Tier 기반 정렬 — A>B>C>D>E>F>G, 동일 Tier 내 total → allAvg → 이력수
@@ -3391,12 +3396,21 @@ function DetailModal({result, req, onClose, onEmail, noScore}) {
 
   const copyReason = function() {
     if (!displayReason) return;
-    var text = displayReason.reason || '';
-    if (displayReason.purpose) text += '\n\n[교육 목표]\n' + displayReason.purpose;
-    if (displayReason.requests && displayReason.requests.length) {
-      text += '\n\n[강사 사전 요청 사항]\n' + displayReason.requests.map(function(r,i){ return (i+1) + '. ' + r; }).join('\n');
+    var lines = [];
+    lines.push('【' + inst.name + ' 강사 추천 이유】');
+    lines.push('');
+    if (displayReason.reason) lines.push(displayReason.reason);
+    if (displayReason.purpose) {
+      lines.push('');
+      lines.push('◦ 교육 목표');
+      lines.push(displayReason.purpose);
     }
-    navigator.clipboard.writeText(text).then(function(){
+    if (displayReason.requests && displayReason.requests.length) {
+      lines.push('');
+      lines.push('◦ 강사 사전 요청 사항');
+      displayReason.requests.forEach(function(r, i) { lines.push((i+1) + '. ' + r); });
+    }
+    navigator.clipboard.writeText(lines.join('\n')).then(function(){
       setCopied(true);
       setTimeout(function(){ setCopied(false); }, 2000);
     });
@@ -3423,7 +3437,7 @@ function DetailModal({result, req, onClose, onEmail, noScore}) {
     if (!next[cid]) return;
     if (next[cid].instructors.indexOf(inst.id) === -1) next[cid].instructors.push(inst.id);
     if (!next[cid].instReasons) next[cid].instReasons = {};
-    next[cid].instReasons[inst.id] = { reason: result.reason || '', aiReason: result.aiReason || '' };
+    next[cid].instReasons[inst.id] = { reason: result.reason || '', aiReason: result.aiReason || '', aiData: displayReason || null };
     saveWL(next);
     setWlMode('done');
     setTimeout(function(){ setWlMode('idle'); }, 2000);
@@ -3434,7 +3448,7 @@ function DetailModal({result, req, onClose, onEmail, noScore}) {
     if (!nm) return;
     var cid = 'course_' + Date.now();
     var next = JSON.parse(JSON.stringify(wishlist));
-    next[cid] = { name: nm, instructors: [inst.id], instReasons: { [inst.id]: { reason: result.reason || '', aiReason: result.aiReason || '' } } };
+    next[cid] = { name: nm, instructors: [inst.id], instReasons: { [inst.id]: { reason: result.reason || '', aiReason: result.aiReason || '', aiData: displayReason || null } } };
     saveWL(next);
     setNewCName('');
     setWlMode('done');
@@ -5029,31 +5043,6 @@ function DBTab({req, onGoCalendar}) {
                 </div>
               )}
 
-              {/* 모니터링 특이사항 */}
-              {(function(){
-                var monRecs = inst.monitoringRecords || [];
-                var items = [];
-                monRecs.forEach(function(m) {
-                  if (m.weaknesses && m.weaknesses.trim()) items.push({label:'유의', text:m.weaknesses, course:m.course});
-                  if (m.issue && m.issue.trim()) items.push({label:'이슈', text:m.issue, course:m.course});
-                });
-                if (!items.length) return null;
-                return (
-                  <div style={{padding:'8px 14px 10px',borderTop:'1px solid var(--border)'}} onClick={function(e){e.stopPropagation();}}>
-                    <div style={{fontSize:10,fontWeight:700,letterSpacing:.8,color:'#FCD34D',marginBottom:5}}>⚠ 모니터링 특이사항</div>
-                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                      {items.map(function(item, ii){
-                        return (
-                          <div key={ii} className="warn-info" style={{fontSize:11,display:'flex',gap:6,alignItems:'flex-start'}}>
-                            <span style={{flexShrink:0,fontWeight:700,opacity:.8}}>[{item.label}]</span>
-                            <span style={{flex:1,lineHeight:1.5}}>{item.text}{item.course && <span style={{opacity:.55,marginLeft:5}}>({item.course})</span>}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           );
         })}
@@ -6007,16 +5996,32 @@ function MyPageTab() {
     var course = wishlist[cid];
     var instructors = (course.instructors || []).map(function(iid){ return INSTRUCTORS.find(function(x){return x.id===iid;}); }).filter(Boolean);
     var lines = [];
-    lines.push('💡 강사 추천 이유 — ' + course.name);
+    lines.push('강사 추천 이유 — ' + course.name);
     lines.push('');
     instructors.forEach(function(inst, i) {
       var reasonData = (course.instReasons || {})[inst.id] || {};
-      var reason = reasonData.reason || '';
-      var aiReason = reasonData.aiReason || '';
-      lines.push((i+1) + '. ' + inst.name + ' 강사');
-      if (reason)   lines.push('   📊 스코어 기반: ' + reason);
-      if (aiReason) lines.push('   ✦ AI 추천: ' + aiReason);
-      if (!reason && !aiReason) lines.push('   (추천 이유 정보 없음 — 추천 탭에서 찜하기 시 자동 저장)');
+      var aiData = reasonData.aiData || null;
+      var aiReason = (aiData && aiData.reason) || reasonData.aiReason || '';
+      var ruleReason = reasonData.reason || '';
+      lines.push((i+1) + '. 【' + inst.name + ' 강사】');
+      if (aiReason) {
+        lines.push(aiReason);
+        if (aiData && aiData.purpose) {
+          lines.push('');
+          lines.push('◦ 교육 목표');
+          lines.push(aiData.purpose);
+        }
+        if (aiData && aiData.requests && aiData.requests.length) {
+          lines.push('');
+          lines.push('◦ 강사 사전 요청 사항');
+          aiData.requests.forEach(function(r, ri) { lines.push((ri+1) + '. ' + r); });
+        }
+      } else if (ruleReason) {
+        lines.push(ruleReason);
+      } else {
+        lines.push('(추천 이유 정보 없음 — 추천 탭에서 찜하기 시 자동 저장)');
+      }
+      if (i < instructors.length - 1) lines.push('');
     });
     navigator.clipboard.writeText(lines.join('\n')).then(function(){
       setCopyToast(cid);
